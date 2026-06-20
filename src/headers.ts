@@ -86,7 +86,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://vidwish.live/",
     },
     {
-        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i, /(?:^|\.)sparqle\./i],
+        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i, /(?:^|\.)sparqle\./i, /(?:^|\.)zapora\./i],
         origin: "https://megaplay.buzz/",
         referer: "https://megaplay.buzz/",
     },
