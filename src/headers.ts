@@ -56,7 +56,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://krussdomi.com/",
     },
     {
-        patterns: [/(?:^|\.)nekostream\.site$/i],
+        patterns: [/(?:^|\.)nekostream\./i, /(?:^|\.)ipstatp\./i],
         origin: "https://vidtube.site",
         referer: "https://vidtube.site/",
     },
