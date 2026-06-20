@@ -25,7 +25,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://animepahe.si/",
     },
     {
-        patterns: [/(?:^|\.)bigdreamsmalldih\./i,
+        patterns: [/(?:^|\.)bigdreamsmalldih\./i],
         origin: "https://mewcdn.online",
         referer: "https://mewcdn.online/",
     },
