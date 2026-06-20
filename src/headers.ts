@@ -91,7 +91,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://vidwish.live/",
     },
     {
-        patterns: [/(?:^|\.)as-cdn21\./i],
+        patterns: [/(?:^|\.)as-cdn21\./i, /(?:^|\.)as-cdn22\./i, /(?:^|\.)as-cdn23\./i, /(?:^|\.)as-cdn24\./i, /(?:^|\.)as-cdn25\./i, /(?:^|\.)as-cdn26\./i,],
         origin: "https://as-cdn21.top",
         referer: "https://as-cdn21.top/",
     },
