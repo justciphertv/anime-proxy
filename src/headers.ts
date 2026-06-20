@@ -14,16 +14,21 @@ interface DomainGroup {
 
 export const DOMAIN_GROUPS: DomainGroup[] = [
     {
-    patterns: [/\.padorupado\.ru$/i, /\.kwikie\.ru$/i, /kwik\.cx$/i, /kwik\.si$/i, /kwik\.li$/i],
-    origin: "https://kwik.cx",
-    referer: "https://kwik.cx/",
-    customHeaders: { "cache-control": "no-cache", pragma: "no-cache" },
-},
-{
-    patterns: [/animepahe\.(?:com|org|ru|si)$/i, /i\.animepahe\.(?:com|org|ru|si)$/i],
-    origin: "https://animepahe.si",
-    referer: "https://animepahe.si/",
-},
+        patterns: [/\.padorupado\.ru$/i, /\.kwikie\.ru$/i, /kwik\.cx$/i, /kwik\.si$/i, /kwik\.li$/i],
+        origin: "https://kwik.cx",
+        referer: "https://kwik.cx/",
+        customHeaders: { "cache-control": "no-cache", pragma: "no-cache" },
+    },
+    {
+        patterns: [/animepahe\.(?:com|org|ru|si)$/i, /i\.animepahe\.(?:com|org|ru|si)$/i],
+        origin: "https://animepahe.si",
+        referer: "https://animepahe.si/",
+    },
+    {
+        patterns: [/(?:^|\.)bigdreamsmalldih\./i,
+        origin: "https://mewcdn.online",
+        referer: "https://mewcdn.online/",
+    },
     {
         patterns: [/\.streamtape\.to$/i],
         origin: "https://streamtape.to",
