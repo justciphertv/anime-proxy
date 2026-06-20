@@ -81,7 +81,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://cloudnestra.com/",
     },
     {
-        patterns: [/(?:^|\.)viddsn\./i, /\.anilike\.cyou$/i, /vidwish\.(?:live|to|com)$/i],
+        patterns: [/(?:^|\.)viddsn\./i, /(?:^|\.)anilike\.cyou$/i, /(?:^|\.)vidwish\./i, /(?:^|\.)trycloud\./i],
         origin: "https://vidwish.live",
         referer: "https://vidwish.live/",
     },
@@ -91,7 +91,7 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://vidwish.live/",
     },
     {
-        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i, /(?:^|\.)sparqle\./i, /(?:^|\.)zapora\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)lumiflow\./i], /(?:^|\.)flarestorm\./i],
+        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i, /(?:^|\.)sparqle\./i, /(?:^|\.)zapora\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)lumiflow\./i, /(?:^|\.)flarestorm\./i, /(?:^|\.)ibyteimg\./i],
         origin: "https://megaplay.buzz/",
         referer: "https://megaplay.buzz/",
     },
