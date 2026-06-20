@@ -51,6 +51,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://krussdomi.com/",
     },
     {
+        patterns: [/(?:^|\.)nekostream\.site$/i],
+        origin: "https://vidtube.site",
+        referer: "https://vidtube.site/",
+    },
+    {
         patterns: [/(?:^|\.)owocdn\.top$/i],
         origin: "https://kwik.cx",
         referer: "https://kwik.cx/",
@@ -77,11 +82,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
     },
     {
         patterns: [/(?:^|\.)watching\.onl$/i],
-        origin: "https://megaplay.buzz",
-        referer: "https://megaplay.buzz/",
+        origin: "https://vidwish.live",
+        referer: "https://vidwish.live/",
     },
     {
-        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i],
+        patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i],
         origin: "https://megaplay.buzz/",
         referer: "https://megaplay.buzz/",
     },
