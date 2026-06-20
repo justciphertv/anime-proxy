@@ -91,6 +91,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://vidwish.live/",
     },
     {
+        patterns: [/(?:^|\.)as-cdn21\./i],
+        origin: "https://as-cdn21.top",
+        referer: "https://as-cdn21.top/",
+    },
+    {
         patterns: [/(?:^|\.)dotstream\./i, /(?:^|\.)playcloud1\./i, /(?:^|\.)mewstream\./i, /(?:^|\.)sparqle\./i, /(?:^|\.)zapora\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)cinewave2\./i, /(?:^|\.)lumiflow\./i, /(?:^|\.)flarestorm\./i, /(?:^|\.)ibyteimg\./i, /(?:^|\.)lostproject\./i],
         origin: "https://megaplay.buzz/",
         referer: "https://megaplay.buzz/",
