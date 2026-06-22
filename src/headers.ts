@@ -76,6 +76,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://player.videasy.to/",
     },
     {
+        patterns: [/(?:^|\.)ephemeralexcursion\./i],
+        origin: "https://cloudorchestranova.com",
+        referer: "https://cloudorchestranova.com/",
+    },
+    {
         patterns: [/(?:^|\.)owocdn\.top$/i],
         origin: "https://kwik.cx",
         referer: "https://kwik.cx/",
