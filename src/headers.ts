@@ -61,9 +61,14 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://vidtube.site/",
     },
     {
-        patterns: [/(?:^|\.)nexlunar99\./i, /(?:^|\.)anotherweather\./i],
+        patterns: [/(?:^|\.)nexlunar99\./i],
         origin: "https://vidcore.net",
         referer: "https://vidcore.net/",
+    },
+    {
+        patterns: [/(?:^|\.)anotherweather\./i],
+        origin: "https://vidfast.pro",
+        referer: "https://vidfast.pro/",
     },
     {
         patterns: [/(?:^|\.)owocdn\.top$/i],
