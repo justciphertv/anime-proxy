@@ -151,6 +151,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://cinesrc.st/",
     },
     {
+        patterns: [/\.peakstorm\.top/i],
+        origin: "https://player.videasy.to",
+        referer: "https://player.videasy.to/",
+    },
+    {
         patterns: [/\.streamcdn\.com$/i],
         origin: "https://anime.uniquestream.net",
         referer: "https://anime.uniquestream.net/",
