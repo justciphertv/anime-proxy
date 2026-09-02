@@ -1,4 +1,5 @@
 // ─── URL Encryption (XOR + base64url) ────────────────────────────────────────
+// Requires XOR_KEY env var to match PROXY_KEY on the API server.
 
 export const XOR_KEY = process.env.XOR_KEY ?? "";
 

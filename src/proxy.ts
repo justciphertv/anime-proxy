@@ -221,7 +221,8 @@ export function registerProxy(app: Hono) {
         let upstream: Response;
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
+            const fetchTimeout = isMediaSegment ? 30000 : 15000;
+            const timeout = setTimeout(() => controller.abort(), fetchTimeout);
 
             upstream = await fetch(targetUrl.href, {
                 method,
@@ -340,18 +341,23 @@ export function registerProxy(app: Hono) {
         }
 
         if (shouldPopulateFullSegmentCache && upstream.status === 200) {
-            try {
-                const cached = await cacheResponseBody(cacheKey, upstream, responseHeaders, "segment");
-                if (cached) {
-                    const cachedResponse = responseFromByteCache(cached, method, rangeVal, cached.headers["X-Proxy-Cache"]);
-                    return new Response(cachedResponse.body, {
-                        status: cachedResponse.status,
-                        headers: cachedResponse.headers,
-                    });
+            const segContentLength = Number(upstream.headers.get("content-length") ?? "0");
+            // Skip buffer for segments without Content-Length (4K streams)
+            // or segments > 10MB to avoid Vercel function timeout
+            if (segContentLength > 0 && segContentLength <= 25 * 1024 * 1024) {
+                try {
+                    const cached = await cacheResponseBody(cacheKey, upstream, responseHeaders, "segment");
+                    if (cached) {
+                        const cachedResponse = responseFromByteCache(cached, method, rangeVal, cached.headers["X-Proxy-Cache"]);
+                        return new Response(cachedResponse.body, {
+                            status: cachedResponse.status,
+                            headers: cachedResponse.headers,
+                        });
+                    }
+                } catch (err) {
+                    console.error(`[Proxy Error] Segment cache failed:`, err);
+                    return c.body(upstream.body as ReadableStream, upstream.status as ContentfulStatusCode, responseHeaders);
                 }
-            } catch (err) {
-                console.error(`[Proxy Error] Segment cache failed:`, err);
-                return c.body(upstream.body as ReadableStream, upstream.status as ContentfulStatusCode, responseHeaders);
             }
         }
 
