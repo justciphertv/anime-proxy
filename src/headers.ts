@@ -151,12 +151,12 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://cinesrc.st/",
     },
     {
-        patterns: [/\.peakstorm\.top/i],
+        patterns: [/(?:^|\.)peakstorm\.top$/i],
         origin: "https://player.videasy.to",
         referer: "https://player.videasy.to/",
     },
     {
-        patterns: [/\.crispglobe\.top/i],
+        patterns: [/(?:^|\.)crispglobe\.top$/i],
         origin: "https://player.videasy.to",
         referer: "https://player.videasy.to/",
     },
