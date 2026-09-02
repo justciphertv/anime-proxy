@@ -9,6 +9,7 @@
 import type { Context } from "hono";
 import { CORS_HEADERS, MEDIA_CACHE_CONTROL } from "./constants.js";
 import { generateHeadersOriginal } from "./headers.js";
+import { decryptUrl, XOR_KEY } from "./crypto.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,60 @@ function concatM4S(buffers: ArrayBuffer[]): Uint8Array {
     return concatTS(buffers);
 }
 
+// ─── URL Resolution for Proxy-Rewritten Manifests ────────────────────────────
+
+/**
+ * Detect proxy-rewritten segment URLs (from ?url= or ?u= parameters)
+ * and decode them to the actual upstream URL.
+ * Also generates the correct headers for the upstream domain.
+ *
+ * @param segUrl   The segment URL as parsed from the M3U8 manifest
+ * @param proxyOrigin  The proxy's own origin (e.g. "http://localhost:3002")
+ * @returns The resolved segment URL and headers to use for fetching
+ */
+function resolveSegmentUrl(
+    segUrl: string,
+    proxyOrigin: string,
+): { url: string; headers: Record<string, string> } {
+    // Case 1: proxy-rewritten URL — ?url=<encoded> (relative to proxy origin)
+    if (segUrl.startsWith("?url=")) {
+        const encoded = segUrl.slice(5);
+        const actualUrl = decodeURIComponent(encoded);
+        try {
+            const u = new URL(actualUrl);
+            return { url: u.href, headers: generateHeadersOriginal(u) };
+        } catch {
+            // Fallback: resolve relative to proxy origin
+            const resolved = new URL(actualUrl, proxyOrigin);
+            return { url: resolved.href, headers: generateHeadersOriginal(resolved) };
+        }
+    }
+
+    // Case 2: encrypted proxy URL — ?u=<encrypted>
+    if (segUrl.startsWith("?u=") && XOR_KEY) {
+        const decrypted = decryptUrl(segUrl.slice(3));
+        if (decrypted) {
+            try {
+                const u = new URL(decrypted);
+                return { url: u.href, headers: generateHeadersOriginal(u) };
+            } catch {
+                const resolved = new URL(decrypted, proxyOrigin);
+                return { url: resolved.href, headers: generateHeadersOriginal(resolved) };
+            }
+        }
+    }
+
+    // Case 3: plain upstream URL (no proxy rewriting)
+    try {
+        const u = new URL(segUrl);
+        return { url: u.href, headers: generateHeadersOriginal(u) };
+    } catch {
+        // Relative URL — resolve against proxy origin as fallback
+        const resolved = new URL(segUrl, proxyOrigin);
+        return { url: resolved.href, headers: generateHeadersOriginal(resolved) };
+    }
+}
+
 // ─── Hono Handler ─────────────────────────────────────────────────────────────
 
 export async function handleRemux(c: Context) {
@@ -232,23 +287,49 @@ export async function handleRemux(c: Context) {
         return c.json({ error: "Missing url parameter. Usage: /api/remux?url=<M3U8_URL>" }, 400, CORS_HEADERS);
     }
 
-    let manifestUrl: URL;
-    try {
-        manifestUrl = new URL(urlParam);
-    } catch {
-        return c.json({ error: "Invalid URL" }, 400, CORS_HEADERS);
-    }
-
     const debug = c.req.query("debug") === "1";
     const concurrency = Math.min(parseInt(c.req.query("concurrency") ?? "10", 10), 20);
 
-    // Step 1: Fetch the manifest
-    const upstreamHeaders = generateHeadersOriginal(manifestUrl);
+    // Determine the proxy's own origin for routing proxy-rewritten URLs
+    const proxyOrigin = new URL(c.req.url).origin;
+
+    // Step 1: Decode the user-provided URL parameter
+    // It might be a plain upstream URL, or a proxy-rewritten URL like
+    //   /api/remux?url=https://proxy/?url%3Dhttps%253A%252F%252Fupstream...
+    // We need to unwrap nested proxy URLs and extract the actual upstream URL.
+    let upstreamManifestUrl: string;
+    let manifestFetchUrl: string;
+
+    // Check if urlParam is a proxy-relative URL containing ?url=
+    const urlParamObj = new URL(urlParam, proxyOrigin);
+    const innerUrl = urlParamObj.searchParams.get("url");
+
+    if (innerUrl) {
+        // Nested proxy URL: decode to get the real upstream URL
+        upstreamManifestUrl = innerUrl;
+        // Fetch through the proxy itself for proper header handling
+        manifestFetchUrl = urlParamObj.href;
+    } else {
+        // Plain URL: use directly
+        upstreamManifestUrl = urlParam;
+        manifestFetchUrl = urlParam;
+    }
+
+    // Parse the upstream manifest URL for header generation
+    let upstreamUrl: URL;
+    try {
+        upstreamUrl = new URL(upstreamManifestUrl);
+    } catch {
+        return c.json({ error: "Invalid upstream URL" }, 400, CORS_HEADERS);
+    }
+
+    // Fetch the manifest
+    const upstreamHeaders = generateHeadersOriginal(upstreamUrl);
     let manifestText: string;
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
-        const resp = await fetch(manifestUrl.href, {
+        const resp = await fetch(manifestFetchUrl, {
             headers: upstreamHeaders,
             redirect: "follow",
             signal: controller.signal,
@@ -258,7 +339,7 @@ export async function handleRemux(c: Context) {
         clearTimeout(timeout);
 
         if (!resp.ok) {
-            return c.json({ error: `Manifest fetch failed: ${resp.status}` }, 502, CORS_HEADERS);
+            return c.json({ error: `Manifest fetch failed: ${resp.status} ${manifestFetchUrl}` }, 502, CORS_HEADERS);
         }
         manifestText = await resp.text();
     } catch (err) {
@@ -266,7 +347,7 @@ export async function handleRemux(c: Context) {
     }
 
     // Step 2: Parse the manifest
-    let parsed = parseM3u8(manifestText, manifestUrl);
+    let parsed = parseM3u8(manifestText, upstreamUrl);
 
     // Step 3: If master playlist, fetch the best variant's media playlist
     if (parsed.type === "master") {
@@ -285,11 +366,10 @@ export async function handleRemux(c: Context) {
         }
 
         try {
-            const variantUrl = new URL(best.url);
-            const variantHeaders = generateHeadersOriginal(variantUrl);
+            const variantHeaders = generateHeadersOriginal(new URL(best.url));
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 15000);
-            const resp = await fetch(variantUrl.href, {
+            const resp = await fetch(best.url, {
                 headers: variantHeaders,
                 redirect: "follow",
                 signal: controller.signal,
@@ -302,7 +382,7 @@ export async function handleRemux(c: Context) {
                 return c.json({ error: `Variant playlist fetch failed: ${resp.status}` }, 502, CORS_HEADERS);
             }
             const variantText = await resp.text();
-            parsed = parseM3u8(variantText, variantUrl);
+            parsed = parseM3u8(variantText, new URL(best.url));
         } catch (err) {
             return c.json({ error: `Variant fetch error: ${err instanceof Error ? err.message : String(err)}` }, 502, CORS_HEADERS);
         }
@@ -323,31 +403,25 @@ export async function handleRemux(c: Context) {
         : mediaSegments;
 
     const totalSegments = orderedSegments.length;
-    const totalSizeEstimate = mediaSegments.reduce((sum, s) => sum + (s.byteRange?.length ?? 0), 0);
 
     // Step 5: Stream the response using a ReadableStream
-    let segmentsDone = 0;
-
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
 
     // Background: download and write segments
     (async () => {
         try {
-            const encoder = new TextEncoder();
-
-            // Write progress header is already sent; we write raw bytes
             for (let i = 0; i < orderedSegments.length; i += concurrency) {
                 const batch = orderedSegments.slice(i, i + concurrency);
                 const batchBuffers = await Promise.all(
                     batch.map(async (seg) => {
-                        return downloadSegment(seg.url, upstreamHeaders, seg.byteRange);
+                        const resolved = resolveSegmentUrl(seg.url, proxyOrigin);
+                        return downloadSegment(resolved.url, resolved.headers, seg.byteRange);
                     }),
                 );
 
                 for (const buf of batchBuffers) {
                     await writer.write(new Uint8Array(buf));
-                    segmentsDone++;
                 }
             }
 
