@@ -404,52 +404,52 @@ export async function handleRemux(c: Context) {
 
     const totalSegments = orderedSegments.length;
 
-    // Step 5: Stream the response using a ReadableStream
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
+    // Step 5: Download all segments, then return as a single buffer
+    // (Streaming via TransformStream doesn't work on Vercel serverless)
+    try {
+        const allBuffers: ArrayBuffer[] = [];
 
-    // Background: download and write segments
-    (async () => {
-        try {
-            for (let i = 0; i < orderedSegments.length; i += concurrency) {
-                const batch = orderedSegments.slice(i, i + concurrency);
-                const batchBuffers = await Promise.all(
-                    batch.map(async (seg) => {
-                        const resolved = resolveSegmentUrl(seg.url, proxyOrigin);
-                        return downloadSegment(resolved.url, resolved.headers, seg.byteRange);
-                    }),
-                );
-
-                for (const buf of batchBuffers) {
-                    await writer.write(new Uint8Array(buf));
-                }
-            }
-
-            await writer.close();
-        } catch (err) {
-            console.error("[Remux Error]", err);
-            try { await writer.abort(err); } catch {}
+        for (let i = 0; i < orderedSegments.length; i += concurrency) {
+            const batch = orderedSegments.slice(i, i + concurrency);
+            const batchBuffers = await Promise.all(
+                batch.map(async (seg) => {
+                    const resolved = resolveSegmentUrl(seg.url, proxyOrigin);
+                    return downloadSegment(resolved.url, resolved.headers, seg.byteRange);
+                }),
+            );
+            allBuffers.push(...batchBuffers);
         }
-    })();
 
-    // Build response headers
-    const responseHeaders: Record<string, string> = {
-        ...CORS_HEADERS,
-        "Content-Type": parsed.extension === "m4s" ? "video/mp4" : "video/mp2t",
-        "Cache-Control": MEDIA_CACHE_CONTROL,
-        "X-Remux-Segments": String(totalSegments),
-        "X-Remux-Extension": parsed.extension,
-        "Transfer-Encoding": "chunked",
-    };
+        // Concatenate all segment buffers
+        const totalLen = allBuffers.reduce((sum, b) => sum + b.byteLength, 0);
+        const result = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const buf of allBuffers) {
+            result.set(new Uint8Array(buf), offset);
+            offset += buf.byteLength;
+        }
 
-    if (debug) {
-        responseHeaders["X-Debug-Segments"] = String(totalSegments);
-        responseHeaders["X-Debug-Extension"] = parsed.extension;
-        responseHeaders["X-Debug-HasInit"] = String(initSegments.length > 0);
+        const responseHeaders: Record<string, string> = {
+            ...CORS_HEADERS,
+            "Content-Type": parsed.extension === "m4s" ? "video/mp4" : "video/mp2t",
+            "Cache-Control": MEDIA_CACHE_CONTROL,
+            "X-Remux-Segments": String(totalSegments),
+            "X-Remux-Extension": parsed.extension,
+            "Content-Length": String(totalLen),
+        };
+
+        if (debug) {
+            responseHeaders["X-Debug-Segments"] = String(totalSegments);
+            responseHeaders["X-Debug-Extension"] = parsed.extension;
+            responseHeaders["X-Debug-HasInit"] = String(initSegments.length > 0);
+        }
+
+        return new Response(result, {
+            status: 200,
+            headers: responseHeaders,
+        });
+    } catch (err) {
+        console.error("[Remux Error]", err);
+        return c.json({ error: `Remux failed: ${err instanceof Error ? err.message : String(err)}` }, 500, CORS_HEADERS);
     }
-
-    return new Response(readable, {
-        status: 200,
-        headers: responseHeaders,
-    });
 }
