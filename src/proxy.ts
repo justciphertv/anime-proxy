@@ -102,6 +102,7 @@ export function registerProxy(app: Hono) {
                         test_upstream: { path: "/api/test-upstream?url=<URL>", method: "GET", description: "Test upstream URL reachability and measure latency.", status: "Operational" },
                         resolve: { path: "/api/resolve?url=<URL>", method: "GET", description: "Follow and report the full redirect chain of a URL.", status: "Operational" },
                         debug_manifest: { path: "/api/debug-manifest?url=<M3U8_URL>", method: "GET", description: "Fetches an M3U8 manifest and returns parsed metadata.", status: "Operational" },
+                        remux: { path: "/api/remux?url=<M3U8_URL>", method: "GET", description: "Download M3U8 playlist, merge all segments (.ts or .m4s), and stream back as a single mp4.", status: "Operational" },
                         info: { path: "/api/info", method: "GET", description: "Lightweight service metadata and live performance metrics.", status: "Operational" },
                         stats: { path: "/api/stats", method: "GET", description: "Real-time performance metrics (HTMX HTML fragment).", status: "Operational" },
                         status_badge: { path: "/api/status", method: "GET", description: "Live status badge. HTML by default, JSON with Accept: application/json.", status: "Operational" },

@@ -20,6 +20,7 @@ import {
 import { getRecentRequests, getActiveConnections, getDomainBreakdown } from "./activity.js";
 import { START_TIME, getRequestCount, getAvgLatency } from "./metrics.js";
 import { getCacheStats } from "./cache.js";
+import { handleRemux } from "./remux.js";
 
 function formatBytes(bytes: number): string {
     const units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -112,6 +113,7 @@ export function registerEndpoints(app: Hono) {
                 activity_export: { path: "/api/activity/export", method: "GET", description: "Export request history and domain breakdown as JSON.", status: "Operational" },
                 metrics: { path: "/api/metrics", method: "GET", description: "Prometheus-compatible text metrics exposition.", status: "Operational" },
                 resolve: { path: "/api/resolve", method: "GET", description: "Follow and report the full redirect chain of a URL.", status: "Operational" },
+                remux: { path: "/api/remux", method: "GET", description: "Download M3U8 playlist, merge all segments, and stream back as mp4.", status: "Operational" },
             },
         }, 200, CORS_HEADERS);
     });
@@ -384,4 +386,8 @@ export function registerEndpoints(app: Hono) {
             chain,
         }, 200, CORS_HEADERS);
     });
+
+    // ─── 9. M3U8 → MP4 Remux ───────────────────────────────────────────────────
+
+    app.get("/api/remux", handleRemux);
 }
