@@ -115,3 +115,77 @@ export function processM3u8Line(
     const q = buildProxyQuery(resolved, debugEnabled, encrypt);
     return `?${q}`;
 }
+
+/**
+ * Rewrite a single line with an async URL signer (for HMAC token proxy).
+ * Falls back to standard proxy query if signer returns null.
+ */
+export async function processM3u8LineSigned(
+    line: string,
+    scrapeUrl: URL,
+    signer: (url: string) => Promise<string | null>,
+): Promise<string> {
+    if (line.length === 0) return "";
+
+    if (line[0] === "#") {
+        if (line.length > 20 && (line.includes('URI="') || line.includes('URL="'))) {
+            const colonPos = line.indexOf(":");
+            if (colonPos !== -1) {
+                const prefix = line.slice(0, colonPos + 1);
+                const attrs = line.slice(colonPos + 1);
+                const rewritten = await rewriteUriAttrsSigned(attrs, scrapeUrl, signer);
+                return prefix + rewritten;
+            }
+        }
+        return line;
+    }
+
+    const resolved = resolveUrl(line, scrapeUrl);
+    const signed = await signer(resolved.href);
+    return signed ?? `?${buildProxyQuery(resolved)}`;
+}
+
+async function rewriteUriAttrsSigned(
+    attrs: string,
+    scrapeUrl: URL,
+    signer: (url: string) => Promise<string | null>,
+): Promise<string> {
+    let result = "";
+    let i = 0;
+    while (i < attrs.length) {
+        const eqPos = attrs.indexOf("=", i);
+        if (eqPos === -1) { result += attrs.slice(i); break; }
+
+        const key = attrs.slice(i, eqPos);
+        const afterEq = eqPos + 1;
+
+        if ((key === "URI" || key === "URL") && attrs[afterEq] === '"') {
+            const parsed = extractQuotedAttr(attrs, afterEq);
+            if (parsed) {
+                const [value, afterClose] = parsed;
+                const resolved = resolveUrl(value, scrapeUrl);
+                const signed = await signer(resolved.href);
+                const proxyPath = signed ?? `?${buildProxyQuery(resolved)}`;
+                result += `${key}="${proxyPath}"`;
+                i = afterClose;
+                continue;
+            }
+        }
+
+        if (attrs[afterEq] === '"') {
+            const parsed = extractQuotedAttr(attrs, afterEq);
+            if (parsed) {
+                const [, afterClose] = parsed;
+                result += attrs.slice(i, afterClose);
+                i = afterClose;
+                continue;
+            }
+        }
+
+        const commaPos = attrs.indexOf(",", afterEq);
+        if (commaPos === -1) { result += attrs.slice(i); break; }
+        result += attrs.slice(i, commaPos + 1);
+        i = commaPos + 1;
+    }
+    return result;
+}

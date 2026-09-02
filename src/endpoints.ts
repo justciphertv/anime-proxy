@@ -21,6 +21,8 @@ import { getRecentRequests, getActiveConnections, getDomainBreakdown } from "./a
 import { START_TIME, getRequestCount, getAvgLatency } from "./metrics.js";
 import { getCacheStats } from "./cache.js";
 import { handleRemux } from "./remux.js";
+import { verifyToken, isTokenProxyEnabled } from "./token.js";
+import { generateHeadersOriginal as genHeaders } from "./headers.js";
 
 function formatBytes(bytes: number): string {
     const units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -387,7 +389,72 @@ export function registerEndpoints(app: Hono) {
         }, 200, CORS_HEADERS);
     });
 
-    // ─── 9. M3U8 → MP4 Remux ───────────────────────────────────────────────────
+    // ─── 9. HMAC-Signed Token Proxy ──────────────────────────────────────────────
+
+    if (isTokenProxyEnabled()) {
+        app.get("/proxy", async (c) => {
+            const urlB64 = c.req.query("url");
+            const expStr = c.req.query("exp");
+            const sig = c.req.query("sig");
+
+            if (!urlB64 || !expStr || !sig) {
+                return c.json({ error: "Missing token parameters (url, exp, sig)" }, 400, CORS_HEADERS);
+            }
+
+            const upstreamUrl = await verifyToken(urlB64, expStr, sig);
+            if (!upstreamUrl) {
+                return c.json({ error: "Invalid or expired token" }, 403, CORS_HEADERS);
+            }
+
+            let target: URL;
+            try {
+                target = new URL(upstreamUrl);
+            } catch {
+                return c.json({ error: "Invalid upstream URL" }, 400, CORS_HEADERS);
+            }
+
+            const upstreamHeaders = genHeaders(target);
+
+            // Forward Range header for partial content
+            const rangeVal = c.req.header("range");
+            if (rangeVal) upstreamHeaders["range"] = rangeVal;
+
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 30000);
+
+                const resp = await fetch(target.href, {
+                    headers: upstreamHeaders,
+                    redirect: "follow",
+                    signal: controller.signal,
+                    // @ts-ignore
+                    tls: { rejectUnauthorized: false },
+                });
+                clearTimeout(timeout);
+
+                // Build response headers
+                const respHeaders: Record<string, string> = { ...CORS_HEADERS };
+                for (const [name, value] of resp.headers.entries()) {
+                    if (name !== "access-control-allow-origin" && name !== "access-control-allow-methods") {
+                        respHeaders[name] = value;
+                    }
+                }
+                // Always set permissive CORS
+                respHeaders["Access-Control-Allow-Origin"] = "*";
+
+                return new Response(resp.body, {
+                    status: resp.status,
+                    headers: respHeaders,
+                });
+            } catch (err) {
+                return c.json({
+                    error: `Upstream fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+                }, 502, CORS_HEADERS);
+            }
+        });
+    }
+
+    // ─── 10. M3U8 → MP4 Remux ──────────────────────────────────────────────────
 
     app.get("/api/remux", handleRemux);
 }

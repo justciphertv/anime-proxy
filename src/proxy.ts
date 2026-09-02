@@ -14,8 +14,9 @@ import {
     MANIFEST_CACHE_CONTROL,
 } from "./constants.js";
 import { generateHeadersOriginal } from "./headers.js";
-import { buildProxyQuery, extractManifestDebug, processM3u8Line, resolveUrl } from "./processor.js";
+import { buildProxyQuery, extractManifestDebug, processM3u8Line, processM3u8LineSigned, resolveUrl } from "./processor.js";
 import { encryptUrl, decryptUrl, XOR_KEY } from "./crypto.js";
+import { signUrl, isTokenProxyEnabled } from "./token.js";
 import { handleDashboard, formatUptime } from "./dashboard.js";
 import { START_TIME, getRequestCount, getAvgLatency } from "./metrics.js";
 import {
@@ -277,17 +278,34 @@ export function registerProxy(app: Hono) {
                 if (textBody.trimStart().startsWith("#EXTM3U")) {
                     const debugInfo = debugEnabled ? extractManifestDebug(textBody) : null;
 
-                    // Build rewritten manifest in one pass without intermediate array
+                    const useTokens = isTokenProxyEnabled();
+
+                    // Build rewritten manifest in one pass
                     let rewritten = "";
                     let start = 0;
                     const len = textBody.length;
-                    while (start < len) {
-                        let end = textBody.indexOf("\n", start);
-                        if (end === -1) end = len;
-                        const lineEnd = end > start && textBody[end - 1] === "\r" ? end - 1 : end;
-                        if (rewritten.length > 0) rewritten += "\n";
-                        rewritten += processM3u8Line(textBody.slice(start, lineEnd), targetUrl, debugEnabled, XOR_KEY ? encryptUrl : undefined);
-                        start = end + 1;
+
+                    if (useTokens) {
+                        // Async path: sign each URL with HMAC token
+                        const signer = (url: string) => signUrl(url);
+                        while (start < len) {
+                            let end = textBody.indexOf("\n", start);
+                            if (end === -1) end = len;
+                            const lineEnd = end > start && textBody[end - 1] === "\r" ? end - 1 : end;
+                            if (rewritten.length > 0) rewritten += "\n";
+                            rewritten += await processM3u8LineSigned(textBody.slice(start, lineEnd), targetUrl, signer);
+                            start = end + 1;
+                        }
+                    } else {
+                        // Sync path: standard ?url= or ?u= encoding
+                        while (start < len) {
+                            let end = textBody.indexOf("\n", start);
+                            if (end === -1) end = len;
+                            const lineEnd = end > start && textBody[end - 1] === "\r" ? end - 1 : end;
+                            if (rewritten.length > 0) rewritten += "\n";
+                            rewritten += processM3u8Line(textBody.slice(start, lineEnd), targetUrl, debugEnabled, XOR_KEY ? encryptUrl : undefined);
+                            start = end + 1;
+                        }
                     }
 
                     if (debugEnabled && debugInfo) {
