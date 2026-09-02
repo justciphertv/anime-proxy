@@ -146,6 +146,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://uqloads.xyz/",
     },
     {
+        patterns: [/\.bright67\.online/i],
+        origin: "https://cinesrc.st",
+        referer: "https://cinesrc.st/",
+    },
+    {
         patterns: [/\.streamcdn\.com$/i],
         origin: "https://anime.uniquestream.net",
         referer: "https://anime.uniquestream.net/",
