@@ -161,6 +161,11 @@ export const DOMAIN_GROUPS: DomainGroup[] = [
         referer: "https://player.videasy.to/",
     },
     {
+        patterns: [/(?:^|\.)polarcandy\.top$/i],
+        origin: "https://player.videasy.to",
+        referer: "https://player.videasy.to/",
+    },
+    {
         patterns: [/(?:^|\.)cleartrail\.top$/i],
         origin: "https://player.videasy.to",
         referer: "https://player.videasy.to/",
